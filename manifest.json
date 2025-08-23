@@ -1,13 +1,12 @@
 {
   "manifest_version": 3,
   "name": "PEP-web Reading Mode",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "PEP-web: one-click clean view (remove page breaks, keep title/author/body, strip links in title/author).",
-  "action": { "default_title": "PEP Article Reader" },
+  "author": "Yan Deng",
+  "homepage_url": "https://github.com/psycat-debug/PEP-web-Reading-Mode",
+  "action": { "default_title": "PEP-web Reading Mode" },
   "background": { "service_worker": "background.js" },
-  "host_permissions": [
-    "https://pep-web.org/*"
-  ],
   "content_scripts": [
     {
       "matches": ["https://pep-web.org/*"],

@@ -20,6 +20,12 @@ Coming soon (link will be added once published).
 ## 📝 License
 MIT License — free to use and modify.  
 
+## 👥 Authors
+- Yan Deng  
+- ChatGPT
+
+GitHub: [psycat-debug](https://github.com/psycat-debug/PEP-web-Reading-Mode)
+
 ---
 
 # 中文说明
@@ -43,3 +49,9 @@ PEP-Web 阅读模式 —— 一款轻量级 Chrome 插件，为 [PEP-Web](https:
 
 ## 📝 License
 MIT 协议 — 免费使用和修改  
+
+## 👥 作者
+- 邓妍  
+- ChatGPT
+
+GitHub: [psycat-debug](https://github.com/psycat-debug/PEP-web-Reading-Mode)
