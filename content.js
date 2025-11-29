@@ -1,82 +1,382 @@
+// content.js — PEP-web Reading Mode overlay version
+
+let __PEP_READING_ON__ = false;
+let __PEP_APP_CONTAINER__ = null;
+let isSearchPopupVisible = false;
+
+// ------- Utility Functions -------
+
 /**
- * content.js — PEP-Web Reading Mode (well-documented edition)
- *
- * Responsibilities:
- *  - Perform "smart stitching" across <div.pagebreak> only when the next run is inline text
- *    and/or a paragraph that is known to be a continuation: <p class="paracont">.
- *  - Hide all content except title/author/body/biblio/summaries; strip links in title/author only.
- *  - Do not change font size/line-height.
- *
- * Trigger:
- *  - background.js sends { type: 'pep/processOnce' } on browser action click.
+ * Retrieves and caches the main application container element.
+ * @returns {Element|null} The application container if found.
  */
+function getPepAppContainer() {
+  if (__PEP_APP_CONTAINER__) return __PEP_APP_CONTAINER__;
+  __PEP_APP_CONTAINER__ = document.querySelector(
+    ".application-container, #application-container"
+  );
+  return __PEP_APP_CONTAINER__;
+}
 
-let __PEP_DONE__ = false;
-
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg?.type === 'pep/processOnce') {
-    if (!__PEP_DONE__) {
-      __PEP_DONE__ = true;
-      const report = processAll();
-      console.log('[PEP]', report);
+/**
+ * Injects CSS styles specific to the reading mode overlay.
+ * Ensures consistent typography, spacing, and visual hierarchy for enhanced readability.
+ */
+function injectReadingStyle() {
+  if (document.getElementById("pep-reading-style")) return;
+  const st = document.createElement("style");
+  st.id = "pep-reading-style";
+  st.textContent = `
+    #pep-reading-root {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      line-height: 1.6;
+      color: #222;
     }
-    sendResponse?.({ ok: true });
-  }
-  return true;
-});
+    #pep-reading-content {
+      max-width: 50rem;
+      margin: 40px auto 60px auto;
+      padding: 0 24px 48px 24px;
+    }
+    #pep-reading-content h1, h2, h3, h4, h5, h6 {
+      font-weight: bold;
+      padding-top: 1rem;
+    }
+    #pep-reading-content h1 {
+      font-size: 1.8rem;
+    }
+    #pep-reading-content h2 {
+      font-size: 1.6rem;
+    }
+    #pep-reading-content h3 {
+      font-size: 1.4rem;
+    }
+    #pep-reading-content .quote, .poem, .dream {
+      border-left: 3px solid #C8A2C8;
+      padding-left: 1rem;
+      font-style: italic;
+    }
+    #pep-reading-content .poem p {
+      padding: 0;
+      margin: 0;
+    }
+    #pep-reading-content p {
+      padding: 0.5rem 0;
+      font-size: 1rem;
+    }
+    #pep-reading-content .art-title {
+      font-size: 1.8rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+    }
+    #pep-reading-content .artauth {
+      font-size: 1rem;
+      color: #555;
+      margin-bottom: 1.5rem;
+    }
+    #pep-reading-content .abstract h1 {
+      font-size: 1rem;
+    }
+    #pep-reading-content .abstract {
+      font-size: 0.95rem;
+      padding: 0.75rem 1rem;
+      border-left: 3px solid #ddd;
+      background: #fafafa;
+      margin-bottom: 1.5rem;
+    }
+    #pep-reading-content .keywords {
+      font-size: 0.9rem;
+      color: #555;
+      margin-bottom: 1.5rem;
+    }
+    #pep-reading-content .biblio,
+    #pep-reading-content .summaries {
+      font-size: 0.9rem;
+      margin-top: 2rem;
+    }
+    .pep-hidden-soft { display: none !important; }
+  `;
+  document.documentElement.appendChild(st);
+}
 
 /**
- * Orchestrates all steps:
- *  1) Smart stitching around page breaks
- *  2) Keep-only whitelist (title/author/body/biblio/summaries) + strip links in title/author
- *  3) Inject minimal base style for pagebreaks
+ * Injects CSS styles for the quick search popup.
+ * Defines layout, colors, and interaction styles for the modal dialog.
  */
-function processAll() {
-  const r1 = stitchPagebreaks_SMART();
-  const r2 = isolateAndStripLinks();
-  injectBaseStyle();
+function injectPopupStyle() {
+  if (document.getElementById("pep-reading-style-popup")) return;
+
+  const st = document.createElement("style");
+  st.id = "pep-reading-style-popup";
+  st.textContent = `
+    #pep-web-search-popup {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      position: fixed;
+      top: 15%;
+      left: 50%;
+      transform: translate(-50%, 0);
+      z-index: 999999;
+      padding: 20px;
+      background: white;
+      border: 0 solid #C8A2C8;
+      border-radius: 15px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      width: 300px;
+      max-width: 90vw;
+      display: none;
+    }
+    #pep-web-search-popup h3 {
+      margin-top: 0; 
+      margin-bottom: 15px; 
+      font-size: 1.2rem; 
+      color: #C8A2C8; 
+      font-weight: bold;
+    }
+    #pep-web-search-popup input {
+      width: 100%; 
+      padding: 8px; 
+      border: 1px solid #ccc; 
+      border-radius: 4px;
+      font-size: 1rem;
+    }
+    #pep-web-search-popup button {
+      width: 100%; 
+      padding: 10px; 
+      background-color: #C8A2C8; 
+      color: white;
+      border: none; 
+      border-radius: 4px; 
+      cursor: pointer; 
+      font-size: 1rem;
+    }
+  `;
+  document.documentElement.appendChild(st);
+}
+
+// ------- Overlay Construction and Management -------
+
+/**
+ * Creates or returns the reading mode overlay element.
+ * Clones key article sections (title, author, body, etc.) into a clean reading container.
+ * @returns {HTMLElement} The overlay root element.
+ */
+function ensurePepReadingOverlay() {
+  let overlay = document.getElementById("pep-reading-root");
+  if (overlay) return overlay;
+
+  overlay = document.createElement("div");
+  overlay.id = "pep-reading-root";
+  Object.assign(overlay.style, {
+    position: "fixed",
+    inset: "0",
+    zIndex: "999998",
+    background: "white",
+    overflow: "auto",
+    display: "none",
+  });
+
+  const wrapper = document.createElement("div");
+  wrapper.id = "pep-reading-content";
+
+  const doc = document;
+  const blocks = [
+    "div.art-title",
+    "div.artauth",
+    "div.abstract",
+    "div.keywords",
+    "div#body.body, #body",
+    "div.biblio",
+    "div.summaries",
+  ];
+
+  let appended = 0;
+  blocks.forEach((sel) => {
+    const el = doc.querySelector(sel);
+    if (!el) return;
+    const cloned = el.cloneNode(true);
+    wrapper.appendChild(cloned);
+    appended++;
+  });
+
+  if (appended === 0) {
+    const fallback = doc.body.cloneNode(true);
+    wrapper.appendChild(fallback);
+  }
+
+  overlay.appendChild(wrapper);
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+/**
+ * Rebuilds the reading overlay with fresh content from the current page.
+ * Useful when navigating between articles without full page reload.
+ * @returns {HTMLElement} The updated overlay.
+ */
+function rebuildReadingOverlay() {
+  const overlay = ensurePepReadingOverlay();
+  overlay.innerHTML = "";
+
+  const wrapper = document.createElement("div");
+  wrapper.id = "pep-reading-content";
+
+  const doc = document;
+  const blocks = [
+    "div.art-title",
+    "div.artauth",
+    "div.abstract",
+    "div.keywords",
+    "div#body.body, #body",
+    "div.biblio",
+    "div.summaries",
+  ];
+
+  let appended = 0;
+  blocks.forEach((sel) => {
+    const el = doc.querySelector(sel);
+    if (!el) return;
+    const cloned = el.cloneNode(true);
+    wrapper.appendChild(cloned);
+    appended++;
+  });
+
+  if (appended === 0) {
+    const fallback = doc.body.cloneNode(true);
+    wrapper.appendChild(fallback);
+  }
+
+  overlay.appendChild(wrapper);
+  overlay.dataset.pepProcessed = "0";
+  return overlay;
+}
+
+// ------- Core Content Processing Logic -------
+
+/**
+ * Applies all necessary transformations to the reading overlay:
+ * - Stitches broken paragraphs across pagebreaks
+ * - Isolates article content by hiding irrelevant DOM nodes
+ * - Removes all hyperlinks for distraction-free reading
+ * @param {Document|Element} root - The root element to process (usually the overlay).
+ * @returns {Object} Summary of processing actions performed.
+ */
+function processAll(root = document) {
+  const r1 = stitchPagebreaks_SMART(root);
+  const r2 = isolateAndStripLinks(root);
+  stripAllLinks(root);
+  injectReadingStyle();
   return { ...r1, ...r2 };
 }
 
-/* =========================================================================================
- * 1) Smart stitching around <div.pagebreak>
- * -----------------------------------------------------------------------------------------
- * Problem addressed:
- *  - In some articles, the second half of a paragraph (after a page break) can appear either:
- *      a) as a loose "inline run" (text nodes / inline elements) not wrapped by <p>, and/or
- *      b) as a proper continuation paragraph: <p class="paracont">.
- *  - We want to merge these pieces into the previous <p>, but only when it is semantically safe.
- *
- * Strategy:
- *  - For each <div.pagebreak>, if there is a left sibling paragraph (prev <p>):
- *      - Collect a "run" of inline/text nodes immediately after the pagebreak.
- *      - If the very next block is <p.paracont>, move its child nodes as well and remove it.
- *      - Insert a single ASCII space between prev <p> and the first moved node when needed
- *        (avoid word-joining in English; skip before <sup>/<sub>).
- *  - Otherwise, fall back to removing or hiding the pagebreak without stitching.
- * =========================================================================================
+/**
+ * Finds the nearest preceding element sibling, ignoring empty text nodes.
+ * @param {Node} node - Starting node.
+ * @returns {Element|null} Previous element sibling or null.
  */
-function stitchPagebreaks_SMART() {
-  const breaks = Array.from(document.querySelectorAll('div.pagebreak'));
+function prevElem(node) {
+  let n = node.previousSibling;
+  while (n) {
+    if (n.nodeType === 1) return n;
+    if (n.nodeType === 3 && n.textContent.trim() !== "") return null;
+    n = n.previousSibling;
+  }
+  return null;
+}
+
+/**
+ * Finds the nearest following element sibling, ignoring empty text nodes.
+ * @param {Node} node - Starting node.
+ * @returns {Element|null} Next element sibling or null.
+ */
+function nextElem(node) {
+  let n = node.nextSibling;
+  while (n) {
+    if (n.nodeType === 1) return n;
+    if (n.nodeType === 3 && n.textContent.trim() !== "") return null;
+    n = n.nextSibling;
+  }
+  return null;
+}
+
+/**
+ * Determines if a pagebreak element can be safely removed (always true for overlays).
+ * @returns {boolean} Always true in this context.
+ */
+function safeToRemove(pb) {
+  return true;
+}
+
+/**
+ * Checks if an element behaves like an inline element.
+ * @param {Element} el - The element to check.
+ * @returns {boolean} True if inline-like.
+ */
+function isInlineLike(el) {
+  const inlineTags = new Set([
+    'A','SPAN','EM','STRONG','I','B','U','SMALL','SUB','SUP',
+    'MARK','CODE','CITE'
+  ]);
+  if (inlineTags.has(el.tagName)) return true;
+  const display = getComputedStyle(el).display;
+  return display === 'inline' || display === 'inline-block';
+}
+
+/**
+ * Determines whether a space should be inserted between two adjacent text fragments
+ * to prevent unintended word concatenation (e.g., "endstart" → "end start").
+ * @param {Element} leftElem - Left-side element.
+ * @param {Node} firstNode - First node on the right side.
+ * @returns {boolean} True if a space is needed.
+ */
+function needsSpaceBetween(leftElem, firstNode) {
+  if (!leftElem || !firstNode) return false;
+
+  const leftText = leftElem.textContent || '';
+  const rightText = firstNode.textContent || '';
+
+  const leftTrimmed = leftText.replace(/\s+$/,'');
+  const rightTrimmed = rightText.replace(/^\s+/,'');
+  if (!leftTrimmed || !rightTrimmed) return false;
+
+  const leftLast = leftTrimmed.slice(-1);
+  const rightFirst = rightTrimmed[0];
+
+  if (/\s/.test(leftLast)) return false;
+  if (/^[\s\.,;:!?\)\]]$/.test(rightFirst)) return false;
+
+  return true;
+}
+
+/**
+ * Intelligently stitches paragraphs split by pagebreak markers.
+ * Merges inline content and <p class="paracont"> continuation paragraphs into the preceding <p>.
+ * @param {Document|Element} root - Root to process.
+ * @returns {Object} Stats on stitched/removed/hidden pagebreaks.
+ */
+function stitchPagebreaks_SMART(root = document) {
+  const doc = root.ownerDocument || root;
+  const breaks = Array.from(root.querySelectorAll('div.pagebreak'));
   let stitched = 0, removed = 0, hidden = 0;
 
   for (const pb of breaks) {
     const prev = prevElem(pb);
 
-    // No left paragraph to stitch into -> handle pagebreak only.
     if (!(prev && prev.tagName === 'P')) {
-      if (safeToRemove(pb)) { pb.remove(); removed++; } else { pb.style.display = 'none'; hidden++; }
+      if (safeToRemove(pb)) { 
+        pb.remove(); 
+        removed++; 
+      } else { 
+        pb.style.display = 'none'; 
+        hidden++; 
+      }
       continue;
     }
 
-    // Collect a run of inline/text nodes right after the pagebreak.
     const toMove = [];
     let cursor = pb.nextSibling;
     let terminalParacont = null;
 
     while (cursor) {
       if (cursor.nodeType === Node.TEXT_NODE) {
-        // Move text nodes as-is (including whitespace) to preserve original spacing as much as possible.
         toMove.push(cursor);
         cursor = cursor.nextSibling;
         continue;
@@ -85,51 +385,49 @@ function stitchPagebreaks_SMART() {
       if (cursor.nodeType === Node.ELEMENT_NODE) {
         const el = /** @type {Element} */(cursor);
 
-        // Stop and remember if we hit a continuation paragraph: <p class="paracont">
         if (el.tagName === 'P' && el.classList.contains('paracont')) {
           terminalParacont = el;
           break;
         }
 
-        // Treat common inline-ish elements as part of the run; stop at block-level elements.
         if (isInlineLike(el)) {
           toMove.push(el);
           cursor = el.nextSibling;
           continue;
         }
-        break; // Hit a block-level / unknown element -> stop collecting.
+        break;
       }
 
-      break; // comments/others -> stop
+      break;
     }
 
-    // Decide if stitching should happen: true when we collected any inline run or found <p.paracont>.
+    const firstNode = toMove[0] || (terminalParacont && terminalParacont.firstChild) || null;
     const shouldStitch = toMove.length > 0 || !!terminalParacont;
 
     if (shouldStitch) {
-      // Insert a single ASCII space if needed to avoid word-joining (English).
-      const firstNode = toMove[0] || (terminalParacont && terminalParacont.firstChild) || null;
       if (needsSpaceBetween(prev, firstNode)) {
-        prev.appendChild(document.createTextNode(' '));
+        prev.appendChild(doc.createTextNode(' '));
       }
 
-      // Move the inline/text run into the left paragraph (not cloning).
       for (const n of toMove) {
         prev.appendChild(n);
       }
 
-      // If <p.paracont> exists, move all its children into the left paragraph, then remove it.
       if (terminalParacont) {
         while (terminalParacont.firstChild) prev.appendChild(terminalParacont.firstChild);
         terminalParacont.remove();
       }
 
-      // Finally, remove the pagebreak.
       pb.remove();
       stitched++;
     } else {
-      // Not a stitchable pattern -> remove/hide the pagebreak only.
-      if (safeToRemove(pb)) { pb.remove(); removed++; } else { pb.style.display = 'none'; hidden++; }
+      if (safeToRemove(pb)) { 
+        pb.remove(); 
+        removed++; 
+      } else { 
+        pb.style.display = 'none'; 
+        hidden++; 
+      }
     }
   }
 
@@ -137,164 +435,286 @@ function stitchPagebreaks_SMART() {
 }
 
 /**
- * Returns true for common inline-ish elements we are comfortable moving as part of a line.
- * Be conservative: default to false unless we positively know it's inline-like.
- * You can extend this list if PEP-Web introduces other inline wrappers after page breaks.
+ * Isolates core article content by hiding all DOM nodes outside key sections.
+ * Also removes links in title and author blocks to prevent navigation.
+ * @param {Document|Element} root - Root to process.
+ * @returns {Object} Stats on isolation results.
  */
-function isInlineLike(el) {
-  const inlineTags = new Set([
-    'A','ABBR','B','BDI','BDO','BR','CITE','CODE','DATA','DFN','EM','I','KBD','MARK',
-    'Q','RB','RP','RT','RTC','RUBY','S','SAMP','SMALL','SPAN','STRONG','SUB','SUP','TIME','U','VAR','WBR'
-  ]);
-  if (inlineTags.has(el.tagName)) return true;
+function isolateAndStripLinks(root = document) {
+  const doc = root.ownerDocument || root;
 
-  // Allow lone IMG to be treated inline if it appears as a continuation artifact
-  if (el.tagName === 'IMG' && el.closest('p') == null) return true;
+  const title = root.querySelector("div.art-title");
+  const author = root.querySelector("div.artauth");
+  const abstract = root.querySelector("div.abstract");
+  const keywords = root.querySelector("div.keywords");
+  const body =
+    root.querySelector("div#body.body") || root.querySelector("#body");
+  const biblio = root.querySelector("div.biblio");
+  const summaries = root.querySelector("div.summaries");
 
-  // Explicitly block common block-level tags
-  const blockTags = new Set(['P','DIV','SECTION','ARTICLE','ASIDE','HEADER','FOOTER',
-                             'H1','H2','H3','H4','H5','H6','UL','OL','LI','TABLE','FIGURE','BLOCKQUOTE','PRE']);
-  if (blockTags.has(el.tagName)) return false;
-
-  // Default (conservative): treat as block-level -> stop the inline run.
-  return false;
-}
-
-/**
- * Decide whether an ASCII space is needed between the left paragraph and the first moved node.
- * Avoid inserting spaces before superscripts/subscripts (common footnote marks).
- */
-function needsSpaceBetween(prevP, firstNode) {
-  if (!firstNode) return false;
-
-  const lastCh = (prevP.innerText || '').trim().slice(-1);
-
-  const startsWithAscii = (node) => {
-    if (!node) return false;
-    if (node.nodeType === Node.TEXT_NODE) {
-      const c = (node.textContent || '').trim().charAt(0);
-      return /[A-Za-z0-9]/.test(c);
-    }
-    if (node.nodeType === Node.ELEMENT_NODE) {
-      const el = /** @type {Element} */(node);
-      if (el.tagName === 'SUP' || el.tagName === 'SUB') return false; // no space before footnote marks
-      const c = (el.innerText || '').trim().charAt(0);
-      return /[A-Za-z0-9]/.test(c);
-    }
-    return false;
-  };
-
-  return /[A-Za-z0-9]/.test(lastCh) && startsWithAscii(firstNode);
-}
-
-/** Safe pagebreak removal heuristic: if it has no interactive/script descendants, remove; else hide. */
-function safeToRemove(pb) {
-  return pb.querySelectorAll('a,button,input,textarea,select,iframe,script').length === 0;
-}
-
-/** Adjacent-element helpers: skip empty text/comment nodes; abort if a non-empty text node is in-between. */
-function prevElem(el){
-  let n = el.previousSibling;
-  while (n) {
-    if (n.nodeType === 1) return n;
-    if (n.nodeType === 3 && n.textContent.trim() !== '') return null;
-    n = n.previousSibling;
-  }
-  return null;
-}
-function nextElem(el){
-  let n = el.nextSibling;
-  while (n) {
-    if (n.nodeType === 1) return n;
-    if (n.nodeType === 3 && n.textContent.trim() !== '') return null;
-    n = n.nextSibling;
-  }
-  return null;
-}
-
-/* =========================================================================================
- * 2) Keep-only whitelist and link stripping
- * -----------------------------------------------------------------------------------------
- * Whitelist roots:
- *  - div.art-title (strip all <a> inside)
- *  - div.artauth   (strip all <a> inside)
- *  - div#body.body (or fallback #body)
- *  - div.biblio
- *  - div.summaries
- *
- * All other elements are hidden with a soft CSS class.
- * =========================================================================================
- */
-function isolateAndStripLinks() {
-  const title     = document.querySelector('div.art-title');
-  const author    = document.querySelector('div.artauth');
-  const body      = document.querySelector('div#body.body') || document.querySelector('#body');
-  const biblio    = document.querySelector('div.biblio');
-  const summaries = document.querySelector('div.summaries');
-
-  // Strip links inside title/author only; keep links elsewhere (e.g., references) intact.
-  [title, author].forEach(block => {
+  [title, author].forEach((block) => {
     if (!block) return;
-    block.querySelectorAll('a').forEach(a => a.replaceWith(document.createTextNode(a.innerText)));
+    block.querySelectorAll("a").forEach((a) => {
+      a.replaceWith(doc.createTextNode(a.innerText));
+    });
   });
 
-  const HID = 'pep-hidden-soft';
-  if (!document.getElementById('pep-isolate-style')) {
-    const st = document.createElement('style');
-    st.id = 'pep-isolate-style';
+  const HID = "pep-hidden-soft";
+
+  if (!doc.getElementById("pep-isolate-style")) {
+    const st = doc.createElement("style");
+    st.id = "pep-isolate-style";
     st.textContent = `.${HID}{display:none!important;}`;
-    document.documentElement.appendChild(st);
+    doc.documentElement.appendChild(st);
   }
 
-  const roots = [title, author, body, biblio, summaries].filter(Boolean);
+  const roots = [
+    title,
+    author,
+    abstract,
+    keywords,
+    body,
+    biblio,
+    summaries,
+  ].filter(Boolean);
   if (!roots.length) return { isolated: false };
 
-  // Build a whitelist: all nodes in the root subtrees + their ancestor chains.
   const whitelist = new Set();
 
   const addTree = (node) => {
     if (!node || whitelist.has(node)) return;
     whitelist.add(node);
-    const walker = document.createTreeWalker(node, NodeFilter.SHOW_ELEMENT, null);
-    while (walker.nextNode()) whitelist.add(walker.currentNode);
+    const walker = doc.createTreeWalker(node, NodeFilter.SHOW_ELEMENT, null);
+    while (walker.nextNode()) {
+      whitelist.add(walker.currentNode);
+    }
   };
 
   const addAnc = (node) => {
     let n = node?.parentElement;
-    while (n && n !== document.body && n !== document.documentElement) {
+    while (n && n !== root && n !== doc.documentElement) {
       whitelist.add(n);
       n = n.parentElement;
     }
-    whitelist.add(document.body);
-    whitelist.add(document.documentElement);
+    whitelist.add(root);
+    whitelist.add(doc.documentElement);
   };
 
   roots.forEach(addTree);
   roots.forEach(addAnc);
 
+  const scope = root === doc ? doc.body : root;
   let hidden = 0;
-  for (const el of document.body.getElementsByTagName('*')) {
-    if (!whitelist.has(el)) { el.classList.add(HID); hidden++; }
+
+  for (const el of scope.getElementsByTagName("*")) {
+    if (!whitelist.has(el)) {
+      el.classList.add(HID);
+      hidden++;
+    }
   }
 
   return { isolated: true, hidden_nodes: hidden };
 }
 
-/* =========================================================================================
- * 3) Minimal base style
- * -----------------------------------------------------------------------------------------
- * Keep styles minimal and local:
- *  - Ensure pagebreaks are hidden (in case any remain)
- *  - Collapse margins around removed pagebreaks to avoid visual gaps
- * =========================================================================================
+/**
+ * Removes all <a> tags by replacing them with their text content.
+ * @param {Element|Document} root - Root to process.
  */
-function injectBaseStyle(){
-  if (document.getElementById('pep-base-style')) return;
-  const st = document.createElement('style');
-  st.id = 'pep-base-style';
-  st.textContent = `
-    div.pagebreak { display:none!important; }
-    div.pagebreak + p, p + div.pagebreak { margin-top:0!important; }
-  `;
-  document.documentElement.appendChild(st);
+function stripAllLinks(root) {
+  const links = root.querySelectorAll("a");
+
+  links.forEach(a => {
+    const text = a.textContent || "";
+    const span = document.createTextNode(text);
+    a.replaceWith(span);
+  });
 }
+
+// --- Search Popup UI and Interaction Logic ---
+
+/**
+ * Creates and injects the quick search popup into the document body.
+ * Includes form fields for author and year, and handles submission.
+ */
+function createSearchPopup() {
+    const popupHTML = `
+        <div id="pep-web-search-popup" >
+            <h3>Quick Search</h3>
+            <form id="pep-web-search-form">
+                <div style="margin-bottom: 10px;">
+                    <input type="text" id="author-input" name="author" placeholder="Author">
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <input type="number" id="year-input" name="year" placeholder="Year" min="1800" max="2100">
+                </div>
+                <button type="submit">Search</button>
+            </form>
+        </div>
+    `;
+
+    if (!document.getElementById('pep-web-search-popup')) {
+        document.body.insertAdjacentHTML('beforeend', popupHTML);
+        const form = document.getElementById('pep-web-search-form');
+        form.addEventListener('submit', handleSearchSubmit);
+    }
+
+    injectPopupStyle();
+}
+
+/**
+ * Handles form submission from the search popup.
+ * Constructs a PEP-Web search URL with author/year parameters and opens it in a new tab.
+ * @param {Event} event - Form submit event.
+ */
+function handleSearchSubmit(event) {
+    event.preventDefault();
+    const author = document.getElementById('author-input').value.trim();
+    const year = document.getElementById('year-input').value.trim();
+
+    const searchTerms = [];
+
+    if (year) {
+        searchTerms.push({ "type": "startYear", "term": year });
+    }
+    if (author) {
+        searchTerms.push({ "type": "author", "term": author });
+    }
+
+    if (searchTerms.length > 0) {
+        const query = encodeURIComponent(JSON.stringify(searchTerms));
+        const url = `https://pep-web.org/search?searchTerms=${query}`;
+        window.open(url, '_blank');
+        toggleSearchPopup(false);
+        
+        document.getElementById('author-input').value = '';
+        document.getElementById('year-input').value = '';
+    } else {
+        console.error('PEP-web Search: Please enter at least an Author or a Year.');
+        document.getElementById('author-input').placeholder = "AUTHOR REQUIRED";
+        document.getElementById('author-input').style.borderColor = 'red';
+    }
+}
+
+/**
+ * Toggles visibility of the search popup.
+ * Manages focus, keyboard listeners, and UI state.
+ * @param {boolean} [show] - If provided, sets visibility to this value; otherwise toggles.
+ */
+function toggleSearchPopup(show) {
+    let popup = document.getElementById('pep-web-search-popup');
+
+    if (!popup) {
+        createSearchPopup();
+        popup = document.getElementById('pep-web-search-popup');
+    }
+    if (!popup) return;
+
+    const authorInput = document.getElementById('author-input');
+
+    if (show !== undefined) {
+        isSearchPopupVisible = show;
+    } else {
+        isSearchPopupVisible = !isSearchPopupVisible;
+    }
+
+    popup.style.display = isSearchPopupVisible ? 'block' : 'none';
+
+    if (isSearchPopupVisible && authorInput) {
+        authorInput.focus();
+        document.addEventListener('keydown', handleEscapeKey);
+    } else {
+        document.removeEventListener('keydown', handleEscapeKey);
+        if (authorInput) {
+            authorInput.style.borderColor = '';
+            authorInput.placeholder = "Author";
+        }
+    }
+}
+
+/**
+ * Closes the search popup when the Escape key is pressed.
+ * @param {KeyboardEvent} event - Key event.
+ */
+function handleEscapeKey(event) {
+    if (event.key === 'Escape') {
+        toggleSearchPopup(false);
+    }
+}
+
+// ------- Chrome Extension Message Listener -------
+
+/**
+ * Listens for messages from the extension background script.
+ * Supports toggling reading mode, legacy processing, and search popup activation.
+ */
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg?.type === "pep/toggleReadingMode") {
+    const app = getPepAppContainer();
+
+    if (!__PEP_READING_ON__) {
+      const overlay = rebuildReadingOverlay();
+      overlay.style.display = "block";
+      const report = processAll(overlay);
+      overlay.dataset.pepProcessed = "1";
+      console.log("[PEP] Reading Mode ON", report);
+
+      if (app) {
+        if (!app.dataset.pepOrigDisplay) {
+          app.dataset.pepOrigDisplay = app.style.display || "";
+        }
+        app.style.display = "none";
+        app.setAttribute("aria-hidden", "true");
+      }
+
+      __PEP_READING_ON__ = true;
+      sendResponse?.({ ok: true, mode: "on" });
+    } else {
+      const overlay = document.getElementById("pep-reading-root");
+      if (overlay) overlay.style.display = "none";
+
+      if (app) {
+        app.style.display = app.dataset.pepOrigDisplay || "";
+        app.removeAttribute("aria-hidden");
+
+        const pbs = app.querySelectorAll("div.pagebreak");
+        pbs.forEach((pb) => {
+          pb.style.display = "block";
+          pb.classList.remove("pep-pagebreak-hidden");
+        });
+      } else {
+        document.querySelectorAll("div.pagebreak").forEach((pb) => {
+          pb.style.display = "block";
+          pb.classList.remove("pep-pagebreak-hidden");
+        });
+      }
+
+      __PEP_READING_ON__ = false;
+      console.log("[PEP] Reading Mode OFF");
+      sendResponse?.({ ok: true, mode: "off" });
+    }
+
+    return true;
+  }
+
+  if (msg?.type === "pep/processOnce") {
+    const overlay = ensurePepReadingOverlay();
+    overlay.style.display = "block";
+    if (!overlay.dataset.pepProcessed) {
+      const report = processAll(overlay);
+      overlay.dataset.pepProcessed = "1";
+      console.log("[PEP] Reading Mode ON via processOnce", report);
+    }
+    __PEP_READING_ON__ = true;
+    sendResponse?.({ ok: true, mode: "on" });
+    return true;
+  }
+
+  if (msg?.action === "toggleSearchPopup") {
+    toggleSearchPopup();
+    sendResponse?.({ ok: true });
+    return true;
+  }
+
+  return true;
+});
+                    

@@ -1,12 +1,33 @@
 {
   "manifest_version": 3,
   "name": "PEP-web Reading Mode",
-  "version": "1.2.1",
-  "description": "PEP-web: one-click clean view (remove page breaks, keep title/author/body, strip links in title/author).",
+  "version": "1.3.3",
+  "description": "Enhances readability and search functionality for PEP-web articles.",
   "author": "Yan Deng",
   "homepage_url": "https://github.com/psycat-debug/PEP-web-Reading-Mode",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "*://pep-web.org/*"
+  ],
   "action": { "default_title": "PEP-web Reading Mode" },
   "background": { "service_worker": "background.js" },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "commands": {
+    "toggle-search-popup": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+P",
+        "mac": "Command+Shift+P"
+      },
+      "description": "Toggle PEP-web Author/Year Search Popup"
+    }
+  },
   "content_scripts": [
     {
       "matches": ["https://pep-web.org/*"],
