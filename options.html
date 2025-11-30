@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PEP-web Reading Mode Options</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background-color: #f4f7f9; color: #333; }
+        .container { max-width: 500px; margin: 0 auto; background-color: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+        h1 { border-bottom: 2px solid; padding-bottom: 10px; margin-bottom: 20px; font-size: 1.5rem; }
+        .setting { margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between; }
+        label { font-weight: 600; flex-grow: 1; }
+        input[type="checkbox"] { transform: scale(1.3); margin-left: 10px; }
+        #status { margin-top: 20px; padding: 10px; border-radius: 6px; background-color: #e9f7ef; color: #3c763d; border: 1px solid #d6e9c6; text-align: center; display: none; }
+        .info { margin-top: 25px; padding: 15px; background-color: #fff3cd; color: #8a6d3b; border-radius: 8px; border-left: 5px solid #ffc107; font-size: 0.9rem; }
+        .info a { color: #8a6d3b; text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>PEP-web Reading Mode Settings</h1>
+
+        <div class="setting">
+            <label for="hideReferences">
+                Hide Reference Section
+            </label>
+            <input type="checkbox" id="hideReferences">
+        </div>
+
+        <div class="setting">
+            <label for="disableBodyLinks">
+                Disable Links in Article
+            </label>
+            <input type="checkbox" id="disableBodyLinks">
+        </div>
+
+        <div id="status">Settings Saved!</div>
+
+        <div class="info">
+            <strong>Shortcut Key:</strong> You can customize the shortcut key for the search popup by visiting the Chrome Extensions page, clicking the menu icon (three horizontal lines) in the top-left, and selecting "Keyboard shortcuts" or by navigating directly to 
+            <a href="chrome://extensions/shortcuts" target="_blank">chrome://extensions/shortcuts</a>. The command is named **Toggle PEP-web Author/Year Search Popup**.
+        </div>
+    </div>
+
+    <script>
+        const statusElement = document.getElementById('status');
+        const hideReferences = document.getElementById('hideReferences');
+        const disableBodyLinks = document.getElementById('disableBodyLinks');
+
+        // Load saved settings
+        function loadSettings() {
+            chrome.storage.sync.get(['hideReferences', 'disableBodyLinks'], (data) => {
+                hideReferences.checked = data.hideReferences !== false; // Default is true
+                disableBodyLinks.checked = data.disableBodyLinks !== false; // Default is true
+            });
+        }
+
+        // Save settings
+        function saveSettings() {
+            chrome.storage.sync.set({
+                hideReferences: hideReferences.checked,
+                disableBodyLinks: disableBodyLinks.checked
+            }, () => {
+                statusElement.style.display = 'block';
+                setTimeout(() => {
+                    statusElement.style.display = 'none';
+                }, 2000);
+            });
+        }
+
+        // Add event listeners
+        hideReferences.addEventListener('change', saveSettings);
+        disableBodyLinks.addEventListener('change', saveSettings);
+
+        // Initialize
+        loadSettings();
+    </script>
+</body>
+</html>
