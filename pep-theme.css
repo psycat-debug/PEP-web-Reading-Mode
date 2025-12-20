@@ -1,0 +1,60 @@
+/* Theme1: Classic */
+#pep-reading-root.pep-theme1 {
+  --pep-bg: #f9f8f6;
+  --pep-box: rgba(255,255,255,0.5);
+  --pep-fg: #333333;
+  --pep-muted: #777777;
+  --pep-accent: #3b82f6;
+
+  background: var(--pep-bg);
+  color: var(--pep-fg);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, "Segoe UI", Roboto, Arial, sans-serif;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+}
+
+/* Theme2: Paper */
+#pep-reading-root.pep-theme2 {
+  /*--pep-bg: #f8f4ec;*/
+  --pep-bg: #ebe7e0;
+  --pep-box: rgba(255,255,255,0.5);
+  --pep-fg: #333333;
+  --pep-muted: #6b6b6b;
+  --pep-accent: #6a7cff;
+
+  background: var(--pep-bg);
+  color: var(--pep-fg);
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, "New York", "Times New Roman", Georgia, serif;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+}
+
+#pep-reading-root.pep-theme2 h1,
+#pep-reading-root.pep-theme2 h2,
+#pep-reading-root.pep-theme2 h3,
+#pep-reading-root.pep-theme2 h4,
+#pep-reading-root.pep-theme2 h5,
+#pep-reading-root.pep-theme2 h6 {
+  font-family: "New York", "Iowan Old Style", "Palatino Linotype", Palatino, "Times New Roman", Georgia, serif;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
+/* Theme3: Night mode */
+#pep-reading-root.pep-theme3 {
+  --pep-bg: #121212;
+  --pep-box: #181818;
+  --pep-fg: #f5f5f5;
+  --pep-muted: #a0a0a0;
+  --pep-accent: #9f9cff;
+
+  background: var(--pep-bg);
+  color: var(--pep-fg);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, "Segoe UI", Roboto, Arial, sans-serif;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+}
+#pep-reading-root.pep-theme3 .artauth, .abstract p {
+  color: var(--pep-fg);
+}
