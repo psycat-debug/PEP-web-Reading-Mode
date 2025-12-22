@@ -1,17 +1,16 @@
 {
   "manifest_version": 3,
   "name": "PEP-web Reading Mode",
-  "version": "1.4.0",
+  "version": "1.4.2",
   "description": "Enhances readability and search functionality for PEP-web articles.",
   "author": "Yan Deng",
   "homepage_url": "https://github.com/psycat-debug/PEP-web-Reading-Mode",
   "permissions": [
-    "activeTab",
-    "storage",
-    "scripting"
+    "storage"
   ],
   "host_permissions": [
-    "*://pep-web.org/*"
+    "https://pep-web.org/*",
+    "https://*.pep-web.org/*"
   ],
   "action": {
     "default_title": "PEP-web Reading Mode"
@@ -20,6 +19,13 @@
     "service_worker": "background.js"
   },
   "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+L",
+        "mac": "Command+Shift+L"
+      },
+      "description": "Toggle PEP-Web Reading Mode"
+    },
     "toggle-search-popup": {
       "suggested_key": {
         "default": "Ctrl+Shift+P",
@@ -30,7 +36,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["*://pep-web.org/*", "*://*.pep-web.org/*"],
+      "matches": ["https://pep-web.org/*", "https://*.pep-web.org/*"],
       "js": ["content.js"],
       "css": ["pep-theme.css"],
       "run_at": "document_idle"
