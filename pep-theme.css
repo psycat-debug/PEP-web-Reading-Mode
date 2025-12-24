@@ -10,7 +10,7 @@
   color: var(--pep-fg);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, "Segoe UI", Roboto, Arial, sans-serif;
   line-height: 1.5;
-  letter-spacing: 0.01em;
+  /*letter-spacing: 0.01em;*/
 }
 
 /* Theme2: Paper */
@@ -57,4 +57,19 @@
 }
 #pep-reading-root.pep-theme3 .artauth, .abstract p {
   color: var(--pep-fg);
+}
+
+/* Theme4: Bionic */
+#pep-reading-root.pep-theme4 {
+  --pep-bg: #f9f8f6;
+  --pep-box: rgba(255,255,255,0.5);
+  --pep-fg: #333333;
+  --pep-muted: #777777;
+  --pep-accent: #3b82f6;
+
+  background: var(--pep-bg);
+  color: var(--pep-fg);
+  font-family: "Fast_Sans", -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, "Segoe UI", Roboto, Arial, sans-serif;
+  letter-spacing: 0 !important;
+  line-height: 2;
 }

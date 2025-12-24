@@ -10,6 +10,7 @@ const DEFAULT_SETTINGS = {
   displayReferences: true,
   displayFootnotes: true,
   theme: "theme1",
+  exportYaml: false,
 };
 
 function getUserSettings() {
@@ -20,6 +21,7 @@ function getUserSettings() {
           "displayReferences",
           "displayFootnotes",
           "theme",
+          "exportYaml",
           // Back-compat
           "hideReferences",
         ],
@@ -41,6 +43,9 @@ function getUserSettings() {
             settings.theme = data.theme.trim();
           }
 
+          if (typeof data.exportYaml === "boolean") {
+            settings.exportYaml = data.exportYaml;   // ⬅️ 新增
+          }
           resolve(settings);
         }
       );
@@ -126,6 +131,7 @@ function injectReadingStyle() {
       font-size: 1rem;
       color: #555;
       margin-bottom: 1.5rem;
+      text-align: center;
     }
     #pep-reading-content .abstract h1 {
       font-size: 1rem;
@@ -173,10 +179,18 @@ function injectReadingStyle() {
 
 function applyTheme(overlay, theme) {
   if (!overlay) return;
-  overlay.classList.remove("pep-theme1", "pep-theme2", "pep-theme3");
-  if (theme === "theme2") overlay.classList.add("pep-theme2");
-  else if (theme === "theme3") overlay.classList.add("pep-theme3");
-  else overlay.classList.add("pep-theme1");
+
+  const fallback = "theme1";
+  const chosen = typeof theme === "string" && /^theme\d+$/.test(theme)
+    ? theme
+    : fallback;
+  const themeClass = `pep-${chosen}`;
+
+  const classes = overlay.className.split(/\s+/).filter(Boolean);
+  const cleaned = classes.filter((c) => !/^pep-theme\d+$/.test(c));
+  overlay.className = cleaned.join(" ");
+
+  overlay.classList.add(themeClass);
 }
 
 /**
@@ -349,6 +363,13 @@ function processAll(root = document, settings = DEFAULT_SETTINGS) {
   const r1 = stitchPagebreaks_SMART(root);
   const r2 = isolateAndStripLinks(root);
 
+  // 移除内嵌翻译按钮（如 <span class="ml-2 translation" ...><svg>...</svg></span>）
+  root.querySelectorAll('span.translation').forEach((span) => {
+    span.remove();
+  });
+  
+  normalizeAuthorBlock(root);
+
   if (settings?.disableBodyLinks) {
     stripAllLinks(root);
   }
@@ -380,6 +401,41 @@ function processAll(root = document, settings = DEFAULT_SETTINGS) {
     stripAllLinks(contentRoot);
 
   return { ...r1, ...r2 };
+}
+
+function normalizeAuthorBlock(root = document) {
+  const doc = root.ownerDocument || document;
+  const artAuth = root.querySelector("div.artauth");
+  if (!artAuth) return;
+
+  if (artAuth.querySelector("p.author")) return;
+
+  let nameSpans = artAuth.querySelectorAll("span.title-author");
+  let names = Array.from(nameSpans)
+    .map((el) => el.innerText.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+
+  if (!names.length) {
+    const aAuthors = artAuth.querySelectorAll("a.author");
+    names = Array.from(aAuthors)
+      .map((el) => el.innerText.replace(/\s+/g, " ").trim())
+      .filter(Boolean);
+  }
+
+  let authorText = "";
+  if (names.length) {
+    authorText = names.join(", ");
+  } else {
+    authorText = artAuth.textContent.replace(/\s+/g, " ").trim();
+  }
+
+  if (!authorText) return;
+
+  artAuth.innerHTML = "";
+  const p = doc.createElement("p");
+  p.className = "author";
+  p.textContent = authorText;
+  artAuth.appendChild(p);
 }
 
 function relocateFootnotes(wrapper, settings) {
@@ -711,9 +767,14 @@ function injectOverlaySettingsPanel(overlay, initialSettings) {
         <option value="theme1">Classic</option>
         <option value="theme2">Paper</option>
         <option value="theme3">Night Mode</option>
+        <option value="theme4">Bionic</option>
       </select>
     </label>
-    <div style="margin-top:12px;text-align:right;">
+    <hr>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+      <strong>Export</strong>
+    </div>
+    <div style="margin-top:12px;">
       <button
         id="pep-export-md-btn"
         type="button"
@@ -722,6 +783,10 @@ function injectOverlaySettingsPanel(overlay, initialSettings) {
         Export to .md
       </button>
     </div>
+    <label style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">
+      <span style="font-size: 0.8rem;">Include YAML</span>
+      <input type="checkbox" id="exportYaml">
+    </label>
   `;
 
   Object.assign(panel.style, {
@@ -741,10 +806,10 @@ function injectOverlaySettingsPanel(overlay, initialSettings) {
 
   overlay.appendChild(panel);
 
-  // ⭐ 新增：安全拿元素
   const refCheckbox  = panel.querySelector("#pep-opt-displayReferences");
   const ftnCheckbox  = panel.querySelector("#pep-opt-displayFootnotes");
   const themeSelect  = panel.querySelector("#pep-opt-theme");
+  const exportYamlCheckbox = panel.querySelector("#exportYaml");
 
   if (refCheckbox) {
     refCheckbox.checked = !!initialSettings.displayReferences;
@@ -754,6 +819,9 @@ function injectOverlaySettingsPanel(overlay, initialSettings) {
   }
   if (themeSelect) {
     themeSelect.value = initialSettings.theme || "theme1";
+  }
+  if (exportYamlCheckbox) {
+    exportYamlCheckbox.checked = !!initialSettings.exportYaml;
   }
 
   const closeBtn = panel.querySelector("#pep-settings-close");
@@ -768,6 +836,7 @@ function injectOverlaySettingsPanel(overlay, initialSettings) {
       displayReferences: refCheckbox ? refCheckbox.checked : !!initialSettings.displayReferences,
       displayFootnotes: ftnCheckbox ? ftnCheckbox.checked : !!initialSettings.displayFootnotes,
       theme: themeSelect ? themeSelect.value : (initialSettings.theme || "theme1"),
+      exportYaml: exportYamlCheckbox ? exportYamlCheckbox.checked : !!initialSettings.exportYaml, // ⬅️ 新增
     };
 
     chrome.storage.sync.set(newSettings, () => {
@@ -775,16 +844,19 @@ function injectOverlaySettingsPanel(overlay, initialSettings) {
     });
   };
 
-  if (refCheckbox)  refCheckbox.addEventListener("change", onChange);
-  if (ftnCheckbox)  ftnCheckbox.addEventListener("change", onChange);
-  if (themeSelect)  themeSelect.addEventListener("change", onChange);
+  if (refCheckbox)        refCheckbox.addEventListener("change", onChange);
+  if (ftnCheckbox)        ftnCheckbox.addEventListener("change", onChange);
+  if (themeSelect)        themeSelect.addEventListener("change", onChange);
+  if (exportYamlCheckbox) exportYamlCheckbox.addEventListener("change", onChange);
 
-    // ⭐ Export .md
+  // ⭐ Export .md
   const exportBtn = panel.querySelector("#pep-export-md-btn");
   if (exportBtn) {
     exportBtn.addEventListener("click", () => {
-      const root = overlay.querySelector("#pep-reading-content") || overlay;
-      exportReadingContentToMarkdown(root);
+      const root = overlay.querySelector("#pep-reading-content");
+      getUserSettings().then(settings => {
+        exportReadingContentToMarkdown(root, settings);
+      });
     });
   }
 }
@@ -797,15 +869,12 @@ console.log("[PEP] applySettingsToOverlay / refs:", settings.displayReferences,
   applyTheme(overlay, settings.theme);
 
   // 2) References
-  // 同时处理 div.biblio 和 p.bibentry（有 div 就整段藏，没 div 就逐行藏）
   const hide = settings.displayReferences === false;
 
-  // 有 div.biblio 的情况：整块隐藏/显示
   root.querySelectorAll("div.biblio").forEach((el) => {
     el.classList.toggle("pep-hidden-soft", hide);
   });
 
-  // 没有 div.biblio 时，至少把每一条 bibentry 藏起来
   root.querySelectorAll("p.bibentry").forEach((p) => {
     p.classList.toggle("pep-hidden-soft", hide);
   });
@@ -815,14 +884,189 @@ console.log("[PEP] applySettingsToOverlay / refs:", settings.displayReferences,
 
 }
 
+// 从 FastBoot shoebox 里提取当前文献的 documentRef
+function getDocumentRefFromShoebox() {
+  // 1. 找到 shoebox 的 <script> 标签
+  const script = document.querySelector('#shoebox-ember-data-storefront');
+  if (!script) {
+    console.warn("[PEP] shoebox script not found");
+    return null;
+  }
+
+  let outer;
+  try {
+    outer = JSON.parse(script.textContent.trim());
+  } catch (e) {
+    console.warn("[PEP] failed to parse shoebox outer JSON", e);
+    return null;
+  }
+
+  if (!outer || !outer.queries || typeof outer.queries !== "object") {
+    console.warn("[PEP] shoebox has no queries object");
+    return null;
+  }
+
+  // 2. 找到 /v2/Documents/Document/... 那条 query
+  const docKey = Object.keys(outer.queries).find((k) =>
+    k.includes("/v2/Documents/Document")
+  );
+  if (!docKey) {
+    console.warn("[PEP] no document query found in shoebox");
+    return null;
+  }
+
+  let docPayload;
+  try {
+    docPayload = JSON.parse(outer.queries[docKey]);
+  } catch (e) {
+    console.warn("[PEP] failed to parse document inner JSON", e);
+    return null;
+  }
+
+  const responseSet = docPayload?.documents?.responseSet;
+  if (!Array.isArray(responseSet) || !responseSet.length) {
+    console.warn("[PEP] document responseSet is empty");
+    return null;
+  }
+
+  const first = responseSet[0];
+
+  // 优先用纯文本 ref，其次是 HTML/XML 版
+  const rawRef =
+    first.documentRef ||
+    first.documentRefHTML ||
+    first.documentRefXML ||
+    null;
+
+  if (typeof rawRef !== "string" || !rawRef.trim()) {
+    console.warn("[PEP] documentRef not found or empty");
+    return null;
+  }
+
+  return rawRef.trim();
+}
+
+function getDocumentMetadataFromShoebox() {
+  const script = document.querySelector("#shoebox-ember-data-storefront");
+  if (!script) return null;
+
+  let outer;
+  try {
+    outer = JSON.parse(script.textContent.trim());
+  } catch (e) {
+    console.warn("[PEP] failed to parse shoebox outer JSON", e);
+    return null;
+  }
+
+  if (!outer || !outer.queries || typeof outer.queries !== "object") {
+    return null;
+  }
+
+  const docKey = Object.keys(outer.queries).find((k) =>
+    k.includes("/v2/Documents/Document")
+  );
+  if (!docKey) return null;
+
+  let docPayload;
+  try {
+    docPayload = JSON.parse(outer.queries[docKey]);
+  } catch (e) {
+    console.warn("[PEP] failed to parse document inner JSON", e);
+    return null;
+  }
+
+  const first = docPayload?.documents?.responseSet?.[0];
+  if (!first) return null;
+
+  // 做一个比较稳的“瘦身版 meta”
+  const meta = {
+    pep_code: first.documentID || null,
+    title: first.title || null,
+    author_mast: first.authorMast || null,
+    author_citation: first.authorCitation || null,
+    source_title: first.sourceTitle || null,
+    year: first.art_year || null,
+    volume: first.art_vol || null,
+    issue: first.art_iss || null,
+    pages: first.art_pgrg || null,
+    language: first.language || null,
+    ref: first.documentRef || null,
+  };
+
+  // 如果有 glossary_group_terms，可以抽成 keywords 列表
+  const facetTerms =
+    docPayload?.documents?.responseInfo?.facetCounts?.facet_fields?.glossary_group_terms;
+  if (facetTerms && typeof facetTerms === "object") {
+    // facetTerms 结构通常是 { "transference": 23, "anxiety": 10, ... }
+    meta.keywords = Object.keys(facetTerms);
+  }
+
+  return meta;
+}
+
+function buildYamlFrontmatter(meta) {
+  if (!meta) return "";
+
+  const esc = (value) => {
+    if (value == null) return null;
+    if (typeof value === "number") return String(value);
+    if (typeof value !== "string") value = String(value);
+    // 简单转义：如果包含冒号/引号/换行，就用双引号包裹
+    if (/[:\n"]/g.test(value)) {
+      return `"${value.replace(/"/g, '\\"')}"`;
+    }
+    return value;
+  };
+
+  const lines = ["---"];
+
+  const pushIf = (key, value) => {
+    if (value == null || value === "" || (Array.isArray(value) && !value.length)) {
+      return;
+    }
+    if (Array.isArray(value)) {
+      lines.push(`${key}:`);
+      value.forEach((item) => {
+        const v = esc(item);
+        if (v != null && v !== "") {
+          lines.push(`  - ${v}`);
+        }
+      });
+    } else {
+      const v = esc(value);
+      if (v != null && v !== "") {
+        lines.push(`${key}: ${v}`);
+      }
+    }
+  };
+
+  pushIf("title", meta.title);
+  pushIf("authors", meta.author_mast);
+  pushIf("journal", meta.source_title);
+  pushIf("pep_code", meta.pep_code);
+  pushIf("year", meta.year);
+  pushIf("volume", meta.volume);
+  pushIf("issue", meta.issue);
+  pushIf("pages", meta.pages);
+  pushIf("language", meta.language);
+  pushIf("ref", meta.ref);
+  pushIf("keywords", meta.keywords || []);
+
+  lines.push("---", ""); // 末尾空行，把正文与 YAML 隔开
+
+  return lines.join("\n");
+}
+
 // --- Export reading content to Markdown ---
 // 导出 #pep-reading-content 为 Markdown：支持 heading / bold / italic，
 // 且 #pep-reading-content 下 .quote, .poem, .dream 里的每个 <p> 前面加 ">  "
-function exportReadingContentToMarkdown(root) {
+function exportReadingContentToMarkdown(root, settings = DEFAULT_SETTINGS) {
   if (!root) {
     alert("No reading content to export.");
     return;
   }
+  const workingRoot = root.cloneNode(true);
+  workingRoot.querySelectorAll(".pep-hidden-soft").forEach((el) => el.remove());
 
   function getInlineMarkdown(node) {
     if (node.nodeType === Node.TEXT_NODE) {
@@ -859,13 +1103,20 @@ function exportReadingContentToMarkdown(root) {
     let out = "";
 
     node.childNodes.forEach((child) => {
-      if (child.nodeType === Node.TEXT_NODE) {
-        const t = child.nodeValue.trim();
-        if (t) {
-          out += t + "\n\n";
-        }
-        return;
+    if (child.nodeType === Node.TEXT_NODE) {
+      let t = child.nodeValue;
+
+      // Keywords 特殊处理
+      if (child.parentElement?.closest(".artkwds")) {
+        t = t.replace(/\s+/g, " ");
       }
+
+      t = t.trim();
+      if (t) {
+        out += t + "\n\n";
+      }
+      return;
+    }
 
       if (child.nodeType !== Node.ELEMENT_NODE) return;
 
@@ -928,29 +1179,31 @@ function exportReadingContentToMarkdown(root) {
     return out;
   }
 
-  let markdown = nodeToMarkdown(root);
-  // 压一下多余空行
+  let markdown = nodeToMarkdown(workingRoot);
   markdown = markdown.replace(/\n{3,}/g, "\n\n").trim() + "\n";
 
-  // --- choose title for filename ---
+  let finalContent = markdown;
+  if (settings?.exportYaml) {
+    const meta = getDocumentMetadataFromShoebox();
+    const yaml = buildYamlFrontmatter(meta);
+    if (yaml) {
+      finalContent = yaml + markdown;
+    }
+  }
 
-  // 1️⃣ 优先用 p.document-nav-ref 里的引文信息
   // --- choose title for filename ---
-
   let title = "";
 
-  // 1️⃣ 直接读源网页 document-nav-ref
+  // 1️⃣ 先试 document-nav-ref（源网页 DOM）
   let nav =
     document.querySelector("p.document-nav-ref") ||
     document.querySelector(".document-nav-ref");
 
   if (nav) {
     let t = nav.textContent.trim();
-
     console.log("[PEP export] using SOURCE nav text:", t);
 
-    // 去掉后面的期刊部分：
-    // 在 ". " + 大写开头英文单词 之前截断
+    // 在 ". " + 大写开头英文单词 之前截断（去掉期刊部分）
     const parts = t.split(/\. (?=[A-Z][a-z]+)/);
     t = parts[0];
 
@@ -958,22 +1211,35 @@ function exportReadingContentToMarkdown(root) {
     t = t.replace(/\s*[:?]\s*/g, " - ");
 
     title = t.trim();
-
     console.log("[PEP export] final nav-based title:", title);
   } else {
-    // fallback：heading 或 document.title
-    const heading =
-      root.querySelector("h1") ||
-      root.querySelector("h2") ||
-      root.querySelector(".art-title");
+    // 2️⃣ nav 没有，就试试 shoebox 里的 documentRef
+    const docRef = getDocumentRefFromShoebox();
+    if (docRef) {
+      console.log("[PEP export] using shoebox documentRef:", docRef);
 
-    if (heading) {
-      title = heading.textContent.trim();
+      let t = docRef;
+
+      // 同样策略：去掉期刊部分 + 处理冒号/问号
+      const parts = t.split(/\. (?=[A-Z][a-z]+)/);
+      t = parts[0];
+      t = t.replace(/\s*[:?]\s*/g, " - ");
+
+      title = t.trim();
+      console.log("[PEP export] final shoebox-based title:", title);
     } else {
-      title = document.title || "pep-article";
+      // 3️⃣ 再不行，才回退到 overlay 内部 heading
+      const heading =
+        root.querySelector(".art-title") ||
+        root.querySelector("h1") ||
+        root.querySelector("h2");
+      if (heading) {
+        title = heading.textContent.trim();
+      } else {
+        title = document.title || "pep-article";
+      }
+      console.log("[PEP export] fallback heading title:", title);
     }
-
-    console.log("[PEP export] fallback heading title:", title);
   }
 
   function makeCrossPlatformFilename(title) {
@@ -1004,7 +1270,7 @@ function exportReadingContentToMarkdown(root) {
 
   const filename = makeCrossPlatformFilename(title) + ".md";
 
-  const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+  const blob = new Blob([finalContent], { type: "text/markdown;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

@@ -7,12 +7,14 @@ document.addEventListener("DOMContentLoaded", () => {
   const displayFootnotes = document.getElementById("displayFootnotes");
   const disableBodyLinks = document.getElementById("disableBodyLinks");
   const theme = document.getElementById("theme");
+  const exportYaml = document.getElementById("exportYaml");
 
   const DEFAULTS = {
     displayReferences: true,
     displayFootnotes: true,
     disableBodyLinks: true,
     theme: "theme1",
+    exportYaml: false,
   };
 
   function flashSaved() {
@@ -48,6 +50,11 @@ document.addEventListener("DOMContentLoaded", () => {
             : DEFAULTS.disableBodyLinks;
 
         theme.value = (data.theme && String(data.theme).trim()) || DEFAULTS.theme;
+
+        exportYaml.checked =
+          typeof data.exportYaml === "boolean"
+            ? data.exportYaml
+            : DEFAULTS.exportYaml;
       }
     );
   }
@@ -59,6 +66,7 @@ document.addEventListener("DOMContentLoaded", () => {
         displayFootnotes: displayFootnotes.checked,
         disableBodyLinks: disableBodyLinks.checked,
         theme: theme.value,
+        exportYaml: exportYaml.checked,
       },
       flashSaved
     );
@@ -68,6 +76,7 @@ document.addEventListener("DOMContentLoaded", () => {
   displayFootnotes.addEventListener("change", saveSettings);
   disableBodyLinks.addEventListener("change", saveSettings);
   theme.addEventListener("change", saveSettings);
+  exportYaml.addEventListener("change", saveSettings);
 
   loadSettings();
 });

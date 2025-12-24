@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PEP-web Reading Mode",
-  "version": "1.4.2",
+  "version": "1.5.0",
   "description": "Enhances readability and search functionality for PEP-web articles.",
   "author": "Yan Deng",
   "homepage_url": "https://github.com/psycat-debug/PEP-web-Reading-Mode",

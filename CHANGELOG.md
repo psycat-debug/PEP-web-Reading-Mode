@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.  
 中文说明在每个版本条目下方。
+---
+
+## v1.5.0 – 2025-12-24
+### English
+- Added an optional YAML frontmatter export that writes PEP document metadata (journal, year, pages, keywords, etc.) into the top of the Markdown file.
+- Added a new “Bionic Reading” theme to make on-screen reading and scanning easier with more pronounced text emphasis.
+
+### 中文
+- 新增可选的 YAML 前置信息导出功能，在 Markdown 顶部写入期刊、年份、页码、关键词等 PEP 元数据，方便在 Obsidian 等知识库中管理文献。
+- 新增 “Bionic Reading” 阅读主题，通过更明显的文字强调，让屏幕阅读和快速扫读更加轻松。
 
 ---
 
