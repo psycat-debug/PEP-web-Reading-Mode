@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## v2.0 - 2026-11-08
+
+- 稳定提供最重要的【去页码 for better translation】功能
+- better 搜索框：新版PEP基于React+Solr，因此旧版基于json的搜索框已失效，已重写搜索框代码
+- better exporting as markdown file: 不再是简单地把脚注聚集到文末，而是使用 markdown syntax [^X]，并在文末生成[^X]: ，在 md 阅读器里更加方便查看
+- 修复导出md文件时因trailing spaces导致的粗斜体失效
+- 还有一些细节上的小改进
+
 ## v1.4.0 – 2025-12-20
 ### English
 - Rebuilt the extension to use a dedicated overlay reading mode instead of modifying the original webpage, allowing instant toggle on/off without refreshing.
