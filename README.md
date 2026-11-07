@@ -1,5 +1,9 @@
 # PEP-Web Reading Mode – Chrome Extension
 
+新版的code写了，readme还没写。
+
+以下是PEP改版前的，不用看了。
+
 English | [中文说明](README_CN.md)
 
 A cleaner, calmer and more readable way to experience psychoanalytic literature on PEP-Web. PEP-Web is an extraordinary archive — but its reading experience is often tiring. This extension turns PEP-Web articles into something that feels closer to a book or academic journal rather than a web page.
