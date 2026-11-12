@@ -57,20 +57,99 @@
         styleBlock.innerHTML = `
             #pep-formatter-panel input[type="checkbox"] { accent-color: #C8A2C8 !important; }
             
-            /* 打印样式：只打印阅读层的内容，隐藏面板和原网页，且支持长文分页 */
+            /* ==========================================
+               Print (印刷) 皮肤样式
+               ========================================== */
+            #pep-formatter-overlay.theme-print {
+                font-family: "EB Garamond", Times, serif !important;
+                font-size: 20px !important;
+            }
+            #pep-formatter-overlay.theme-print p,
+            #pep-formatter-overlay.theme-print li {
+                margin-top: 0.5em !important;
+                margin-bottom: 0.5em !important;
+                line-height: 1.1 !important;
+            }
+            #pep-formatter-overlay.theme-print h1, 
+            #pep-formatter-overlay.theme-print h2, 
+            #pep-formatter-overlay.theme-print h3 {
+                font-family: "EB Garamond", Times, serif !important;
+            }
+            /* 隐藏原网页的匹配段落等功能按钮 */
+            #pep-formatter-overlay button {
+                display: none !important;
+            }
+
+            /* ==========================================
+               物理打印机优化 (Command+P)
+               ========================================== */
             @media print {
-                body > *:not(#pep-formatter-overlay) {
-                    display: none !important;
+                @page {
+                    margin: 60px 40px; 
                 }
-                #pep-formatter-panel, #pep-web-search-popup {
-                    display: none !important;
-                }
+                * {
+                    text-rendering: geometricPrecision !important;
+                    -webkit-font-smoothing: antialiased !important;
+                  }
+                body > *:not(#pep-formatter-overlay) { display: none !important; }
+                #pep-formatter-panel, #pep-web-search-popup { display: none !important; }
                 #pep-formatter-overlay {
-                    position: static !important;
+                    position: static !important; 
                     height: auto !important;
-                    overflow: visible !important;
-                    padding: 0 !important;
+                    overflow: visible !important; 
+                    padding: 0 !important; 
                     background: transparent !important;
+                }
+                #pep-formatter-overlay, 
+                #pep-formatter-overlay * {
+                    color: #202020 !important;
+                    /* 👇 新增：剔除触发栅格化的 CSS 属性，确保 PDF 为纯矢量且文字清晰 */
+                    box-shadow: none !important;
+                    text-shadow: none !important;
+                    filter: none !important;
+                    backdrop-filter: none !important;
+                    opacity: 1 !important;
+                    transform: none !important;
+                    mix-blend-mode: normal !important;
+                }
+                #pep-formatter-overlay .ref-link {
+                    text-decoration: none !important;
+                    font-weight: normal !important;
+                }
+                #pep-formatter-overlay section[role="doc-bibliography"] ul,
+                #pep-formatter-overlay section[role="doc-bibliography"] li,
+                #pep-formatter-overlay section[role="doc-bibliography"] span {
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    font-size: 80% !important;
+                }
+                
+                /* 👇 新增：打印时彻底展平 Keywords 为一行纯文本 */
+                #pep-formatter-overlay section[aria-labelledby="keywords-heading"] {
+                    display: block !important;
+                    margin-top: 0.5em !important;
+                    margin-bottom: 0.5em !important;
+                }
+                #pep-formatter-overlay section[aria-labelledby="keywords-heading"] h2 {
+                    display: none !important; /* 隐藏屏幕阅读器专属的标题 */
+                }
+                #pep-formatter-overlay section[aria-labelledby="keywords-heading"] div,
+                #pep-formatter-overlay section[aria-labelledby="keywords-heading"] span {
+                    display: inline !important; /* 强制所有内部元素变为行内文本 */
+                    background: transparent !important;
+                    border: none !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    line-height: inherit !important;
+                }
+                #pep-formatter-overlay section[aria-labelledby="keywords-heading"] > div > span:first-child {
+                    margin-right: 0.3em !important; /* Keywords: 冒号后面加点空格 */
+                }
+                #pep-formatter-overlay [data-slot="tag"]::after {
+                    content: ", "; /* 用逗号分隔标签 */
+                }
+                #pep-formatter-overlay [data-slot="tag"]:last-child::after {
+                    content: ""; /* 最后一个标签不加逗号 */
                 }
             }
         `;
@@ -97,9 +176,43 @@
             }
         }
 
-        // 清理 author info
+        // ==========================================
+        // 处理 Author 字段与 Author information 面板
+        // ==========================================
         const authorInfoSection = articleClone.querySelector('section[aria-labelledby="author-info-heading"]');
-        if (authorInfoSection) authorInfoSection.remove();
+        if (authorInfoSection) {
+            // 1. 删除上方的 Author 一行
+            const authorLine = authorInfoSection.previousElementSibling;
+            if (authorLine && authorLine.textContent.includes('Author:')) {
+                authorLine.remove();
+            }
+
+            // 2. 将 Author information 从下拉框展平为直接显示的纯文本
+            const buttonHeading = authorInfoSection.querySelector('h3');
+            if (buttonHeading) {
+                buttonHeading.remove(); // 删除带有箭头的触发按钮
+            }
+
+            const panel = authorInfoSection.querySelector('[data-slot="disclosure-group-panel"]');
+            if (panel) {
+                panel.removeAttribute('hidden'); 
+                panel.style.cssText = 'height: auto !important; display: block !important;'; 
+                panel.classList.remove('overflow-clip'); 
+                
+                // 👇 新增：将包含具体信息的叶子 div 转换成 p 标签
+                const allDivs = panel.querySelectorAll('div');
+                allDivs.forEach(div => {
+                    // 如果这个 div 内部没有更深层的 div 了（叶子节点），将其转换为 p 标签
+                    if (div.querySelector('div') === null) {
+                        const p = document.createElement('p');
+                        p.innerHTML = div.innerHTML;
+                        // 给每行信息加上下边距，保证视觉上的换行与美观
+                        p.style.cssText = 'margin-top: 0.5em !important; margin-bottom: 0.5em !important;';
+                        div.parentNode.replaceChild(p, div);
+                    }
+                });
+            }
+        }
 
         // 收集 Footnotes
         const footnotesList = articleClone.querySelectorAll('li[id^="F0"]');
@@ -113,24 +226,68 @@
         footnotesList.forEach(fn => footnoteOl.appendChild(fn)); 
         footnoteContainer.appendChild(footnoteOl);
 
-        // 缝合断句
+        // ==========================================
+        // 缝合断句 (DOM级操作，防止跨结构误缝合)
+        // ==========================================
         const pageAnchors = articleClone.querySelectorAll('a[id^="P0"]');
         pageAnchors.forEach(anchor => {
             const pageDiv = anchor.closest('div.my-6'); 
             if (!pageDiv) return;
-            const prevEl = pageDiv.previousElementSibling;
-            const nextEl = pageDiv.nextElementSibling;
-
-            if (prevEl && nextEl && prevEl.tagName === 'P' && nextEl.tagName === 'P') {
-                const text1 = prevEl.innerHTML.trim();
-                const text2 = nextEl.innerHTML.trim();
-                if (prevEl.textContent.trim().endsWith('-')) {
-                    prevEl.innerHTML = text1.slice(0, -1) + text2;
-                } else {
-                    prevEl.innerHTML = text1 + ' ' + text2;
-                }
-                nextEl.remove(); 
+            
+            // 向上寻找最近的 <p>
+            let prevP = null;
+            let prevSibling = pageDiv.previousElementSibling;
+            while (prevSibling) {
+                if (prevSibling.tagName === 'P') { prevP = prevSibling; break; }
+                const ps = prevSibling.querySelectorAll('p');
+                if (ps.length > 0) { prevP = ps[ps.length - 1]; break; }
+                
+                // 【修复核心】如果遇到其它有实质文字的块（如 h2），说明段落被打断，刹车放弃
+                if (prevSibling.textContent.replace(/\s/g, '').length > 0) break;
+                
+                prevSibling = prevSibling.previousElementSibling;
             }
+            
+            // 向下寻找最近的 <p>
+            let nextP = null;
+            let nextSibling = pageDiv.nextElementSibling;
+            while (nextSibling) {
+                if (nextSibling.tagName === 'P') { nextP = nextSibling; break; }
+                const ps = nextSibling.querySelectorAll('p');
+                if (ps.length > 0) { nextP = ps[0]; break; }
+                
+                // 【修复核心】同理，如果遇到 h2 等带有文字的拦截者，立即刹车
+                if (nextSibling.textContent.replace(/\s/g, '').length > 0) break;
+                
+                nextSibling = nextSibling.nextElementSibling;
+            }
+
+            // 只有当紧挨着分页符上下确实都是段落时，才执行缝合
+            if (prevP && nextP) {
+                // 提取 prevP 中最后一个【有实际内容】的文本节点
+                let lastTextNode = null;
+                const walker = document.createTreeWalker(prevP, NodeFilter.SHOW_TEXT, null, false);
+                let node;
+                while ((node = walker.nextNode())) {
+                    if (node.nodeValue.trim() !== '') {
+                        lastTextNode = node;
+                    }
+                }
+
+                if (lastTextNode && lastTextNode.nodeValue.trim().endsWith('-')) {
+                    lastTextNode.nodeValue = lastTextNode.nodeValue.replace(/-\s*$/, '');
+                } else {
+                    prevP.appendChild(document.createTextNode(' '));
+                }
+
+                while (nextP.firstChild) {
+                    prevP.appendChild(nextP.firstChild);
+                }
+                
+                const nextContainer = nextP.closest('[data-slot="disclosure"]') || nextP;
+                nextContainer.remove(); 
+            }
+            
             pageDiv.remove(); 
         });
 
@@ -147,6 +304,17 @@
 
         // References 清理与转 ul
         const referenceContainer = articleClone.querySelector('section[role="doc-bibliography"]');
+
+        if (footnotesList.length > 0) {
+            if (referenceContainer) {
+                // 只要存在参考资料，就把脚注插在它前面
+                referenceContainer.parentNode.insertBefore(footnoteContainer, referenceContainer);
+            } else {
+                // 万一这篇文章没有参考资料，则 fallback 到文章最末尾
+                articleClone.appendChild(footnoteContainer);
+            }
+        }
+        
         if (referenceContainer) {
             const ignoredElements = referenceContainer.querySelectorAll('[data-reader-search-ignore="true"]');
             ignoredElements.forEach(el => el.remove());
@@ -210,6 +378,21 @@
         };
         linkLabel.append(linkCheckbox, document.createTextNode('Disable Links'));
 
+        // Print 皮肤切换按钮
+        const printThemeLabel = document.createElement('label');
+        printThemeLabel.style.cssText = 'display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; color: #111;';
+        const printThemeCheckbox = document.createElement('input');
+        printThemeCheckbox.type = 'checkbox';
+        printThemeCheckbox.checked = false; // 默认不开启，如果想默认开启请改为 true 并在 overlay 上默认添加 class
+        printThemeCheckbox.onchange = (e) => {
+            if (e.target.checked) {
+                overlay.classList.add('theme-print');
+            } else {
+                overlay.classList.remove('theme-print');
+            }
+        };
+        printThemeLabel.append(printThemeCheckbox, document.createTextNode('Print Theme'));
+
         const exportBtn = document.createElement('button');
         exportBtn.innerText = 'Export as Markdown';
         exportBtn.style.cssText = 'background: #C8A2C8; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 500; transition: background 0.2s; margin-top: 4px;';
@@ -239,7 +422,20 @@
         authorInfo.innerHTML = 'author: <a href="https://github.com/psycat-debug/" target="_blank" style="color: #C8A2C8; text-decoration: none; font-weight: 500;">psycat-debug</a>';
         authorInfo.style.cssText = 'font-size: 12px; color: #888; text-align: center; margin-top: 2px;';
 
-        panel.append(panelTitle, refLabel, fnLabel, linkLabel, document.createElement('hr'), exportBtn, exitBtn, authorInfo);
+        // 重新排版：选项框按功能分组并使用 hr 隔开
+        panel.append(
+            panelTitle, 
+            // 暂时隐藏 Print Theme UI 及其专属分割线
+            // printThemeLabel, 
+            // document.createElement('hr'), 
+            refLabel, 
+            fnLabel, 
+            linkLabel, 
+            document.createElement('hr'), 
+            exportBtn, 
+            exitBtn, 
+            authorInfo
+        );
         document.body.appendChild(panel);
 
         // ---- Helper Functions (Scoped) ----
@@ -315,7 +511,7 @@
                             traverse(child); 
                             let liText = md.substring(startLen);
                             md = md.substring(0, startLen); 
-                            md += prefix + liText.replace(/^\s+/, '') + '\n';
+                            md += prefix + liText.trim() + '\n';
                         }
                         else if (tag === 'ul' || tag === 'ol') { md += '\n'; traverse(child); md += '\n'; }
                         else if (tag === 'button') { continue; } 
